@@ -4526,7 +4526,7 @@ RtlCheckBit(
     _In_range_(<, BitMapHeader->SizeOfBitMap) ULONG BitPosition
     )
 {
-#ifdef _M_IX86
+#if defined _M_IX86 || _M_ARM
     return (((PLONG)BitMapHeader->Buffer)[BitPosition / 32] >> (BitPosition % 32)) & 0x1;
 #else
     return BitTest64((LONG64 const *)BitMapHeader->Buffer, (LONG64)BitPosition);

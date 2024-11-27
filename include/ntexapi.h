@@ -2162,6 +2162,11 @@ C_ASSERT(FIELD_OFFSET(KUSER_SHARED_DATA, TickCountQuad) == 0x320);
 #define USER_SHARED_DATA ((KUSER_SHARED_DATA * const)0x7ffe0000)
 #endif
 
+#ifdef _M_ARM
+#define USER_SHARED_DATA ((KUSER_SHARED_DATA * const)0x7ffe0000)
+#endif
+
+
 #ifdef _M_X64
 #define USER_SHARED_DATA ((KUSER_SHARED_DATA * const)0x7ffe0000)
 #endif

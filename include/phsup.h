@@ -273,7 +273,7 @@ FORCEINLINE LONG_PTR _InterlockedExchangeAddPointer(
     _In_ LONG_PTR Value
     )
 {
-#ifdef _M_IX86
+#if defined _M_IX86 || defined _M_ARM
     return (LONG_PTR)_InterlockedExchangeAdd((PLONG)Addend, (LONG)Value);
 #else
     return (LONG_PTR)_InterlockedExchangeAdd64((PLONG64)Addend, (LONG64)Value);
@@ -284,7 +284,7 @@ FORCEINLINE LONG_PTR _InterlockedIncrementPointer(
     _Inout_ _Interlocked_operand_ LONG_PTR volatile *Addend
     )
 {
-#ifdef _M_IX86
+#if defined _M_IX86 || defined _M_ARM
     return (LONG_PTR)_InterlockedIncrement((PLONG)Addend);
 #else
     return (LONG_PTR)_InterlockedIncrement64((PLONG64)Addend);
@@ -295,7 +295,7 @@ FORCEINLINE LONG_PTR _InterlockedDecrementPointer(
     _Inout_ _Interlocked_operand_ LONG_PTR volatile *Addend
     )
 {
-#ifdef _M_IX86
+#if defined _M_IX86 || defined _M_ARM
     return (LONG_PTR)_InterlockedDecrement((PLONG)Addend);
 #else
     return (LONG_PTR)_InterlockedDecrement64((PLONG64)Addend);
@@ -307,7 +307,7 @@ FORCEINLINE BOOLEAN _InterlockedBitTestAndResetPointer(
     _In_ LONG_PTR Bit
     )
 {
-#ifdef _M_IX86
+#if defined _M_IX86 || defined _M_ARM
     return _interlockedbittestandreset((PLONG)Base, (LONG)Bit);
 #else
     return _interlockedbittestandreset64((PLONG64)Base, (LONG64)Bit);
@@ -319,7 +319,7 @@ FORCEINLINE BOOLEAN _InterlockedBitTestAndSetPointer(
     _In_ LONG_PTR Bit
     )
 {
-#ifdef _M_IX86
+#if defined _M_IX86 || defined _M_ARM
     return _interlockedbittestandset((PLONG)Base, (LONG)Bit);
 #else
     return _interlockedbittestandset64((PLONG64)Base, (LONG64)Bit);

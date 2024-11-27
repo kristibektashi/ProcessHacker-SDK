@@ -2690,7 +2690,7 @@ typedef struct _PH_FREE_LIST_ENTRY
     QUAD_PTR Body;
 } PH_FREE_LIST_ENTRY, *PPH_FREE_LIST_ENTRY;
 
-#ifdef _M_IX86
+#if defined _M_IX86 || defined _M_ARM
 C_ASSERT(FIELD_OFFSET(PH_FREE_LIST_ENTRY, ListEntry) == 0x0);
 C_ASSERT(FIELD_OFFSET(PH_FREE_LIST_ENTRY, Body) == 0x8);
 #else
