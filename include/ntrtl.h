@@ -577,6 +577,31 @@ RtlRbRemoveNode(
 
 #endif
 
+
+#ifdef _ARM_
+//*HACK* *HACK*
+//ARM build issues.. not sure where else to put these :S
+
+NTSYSAPI
+PSLIST_ENTRY
+NTAPI
+ExpInterlockedPopEntrySList (
+    _Inout_ PSLIST_HEADER ListHead
+    );
+
+NTSYSAPI
+VOID
+NTAPI
+InitializeSListHead (
+    _Out_ PSLIST_HEADER ListHead
+    );
+
+//#define RtlInterlockedPopEntrySList     ExpInterlockedPopEntrySList
+//#define RtlInitializeSListHead          InitializeSListHead
+
+#endif
+//END HACK
+
 // Hash tables
 
 // begin_ntddk
@@ -1421,9 +1446,20 @@ RtlCreateUnicodeStringFromAsciiz(
 NTSYSAPI
 VOID
 NTAPI
+RtlFreeAnsiString(
+    __in PANSI_STRING UnicodeString
+    );
+
+#if defined _ARM_
+#define RtlFreeUnicodeString(str)   RtlFreeAnsiString((PANSI_STRING)(str))
+#else
+NTSYSAPI
+VOID
+NTAPI
 RtlFreeUnicodeString(
     _In_ PUNICODE_STRING UnicodeString
     );
+#endif
 
 #define RTL_DUPLICATE_UNICODE_STRING_NULL_TERMINATE (0x00000001)
 #define RTL_DUPLICATE_UNICODE_STRING_ALLOCATE_NULL_STRING (0x00000002)
@@ -2463,12 +2499,24 @@ RtlCreateProcessParametersEx(
     );
 #endif
 
+
+NTSYSAPI
+NTSTATUS
+NTAPI
+RtlDestroyEnvironment(
+    PVOID arg1
+    );
+
+#if defined _ARM_
+#define RtlDestroyProcessParameters(procParam) RtlDestroyEnvironment((PVOID)(procParam))
+#else
 NTSYSAPI
 NTSTATUS
 NTAPI
 RtlDestroyProcessParameters(
     _In_ _Post_invalid_ PRTL_USER_PROCESS_PARAMETERS ProcessParameters
     );
+#endif
 
 NTSYSAPI
 PRTL_USER_PROCESS_PARAMETERS
@@ -4669,6 +4717,9 @@ RtlCheckBit(
     return (((PLONG)BitMapHeader->Buffer)[BitPosition / 32] >> (BitPosition % 32)) & 0x1;
 #endif
 }
+#else
+#define RtlCheckBit(BMH,BP) (((((PLONG)(BMH)->Buffer)[(BP)/32]) >> ((BP)%32)) & 0x1)
+#endif
 
 NTSYSAPI
 ULONG
