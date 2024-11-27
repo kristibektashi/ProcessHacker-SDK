@@ -577,6 +577,31 @@ RtlRbRemoveNode(
 
 #endif
 
+
+// #ifdef _M_ARM_
+// //*HACK* *HACK*
+// //ARM build issues.. not sure where else to put these :S
+
+// NTSYSAPI
+// PSLIST_ENTRY
+// NTAPI
+// ExpInterlockedPopEntrySList (
+//     _Inout_ PSLIST_HEADER ListHead
+//     );
+
+// NTSYSAPI
+// VOID
+// NTAPI
+// InitializeSListHead (
+//     _Out_ PSLIST_HEADER ListHead
+//     );
+
+// //#define RtlInterlockedPopEntrySList     ExpInterlockedPopEntrySList
+// //#define RtlInitializeSListHead          InitializeSListHead
+
+// #endif
+// //END HACK
+
 // Hash tables
 
 // begin_ntddk
