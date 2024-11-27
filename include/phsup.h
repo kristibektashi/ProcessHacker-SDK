@@ -409,7 +409,7 @@ FORCEINLINE VOID PhPrintPointer(
 {
     Destination[0] = '0';
     Destination[1] = 'x';
-#ifdef _M_IX86
+#if defined _M_IX86 || defined _M_ARM_
     _ultow((ULONG)Pointer, &Destination[2], 16);
 #else
     _ui64tow((ULONG64)Pointer, &Destination[2], 16);
