@@ -135,7 +135,7 @@ typedef enum _PROCESSINFOCLASS
     ProcessResourceManagement,
     ProcessCookie, // q: ULONG
     ProcessImageInformation, // q: SECTION_IMAGE_INFORMATION
-    ProcessCycleTime, // q: PROCESS_CYCLE_TIME_INFORMATION
+    ProcessCycleTime, // q: PROCESS_CYCLE_TIME_INFORMATION // since VISTA
     ProcessPagePriority, // q: ULONG
     ProcessInstrumentationCallback, // 40
     ProcessThreadStackAllocation, // s: PROCESS_STACK_ALLOCATION_INFORMATION, PROCESS_STACK_ALLOCATION_INFORMATION_EX
@@ -154,7 +154,11 @@ typedef enum _PROCESSINFOCLASS
     ProcessHandleCheckingMode,
     ProcessKeepAliveCount, // q: PROCESS_KEEPALIVE_COUNT_INFORMATION
     ProcessRevokeFileHandles, // s: PROCESS_REVOKE_FILE_HANDLES_INFORMATION
-    ProcessWorkingSetControl,
+    ProcessWorkingSetControl, // s: PROCESS_WORKING_SET_CONTROL
+    ProcessHandleTable, // since WINBLUE
+    ProcessCheckStackExtentsMode,
+    ProcessCommandLineInformation, // 60, q: UNICODE_STRING
+    ProcessProtectionInformation, // q: PS_PROTECTION
     MaxProcessInfoClass
 } PROCESSINFOCLASS;
 #endif
@@ -197,6 +201,7 @@ typedef enum _THREADINFOCLASS
     ThreadCounterProfiling,
     ThreadIdealProcessorEx, // q: PROCESSOR_NUMBER
     ThreadCpuAccountingInformation, // since WIN8
+    ThreadSuspendCount, // since WINBLUE
     MaxThreadInfoClass
 } THREADINFOCLASS;
 #endif
@@ -498,28 +503,97 @@ typedef struct _PROCESS_HANDLE_SNAPSHOT_INFORMATION
 #if (PHNT_MODE != PHNT_MODE_KERNEL)
 
 // private
+typedef struct _PROCESS_MITIGATION_CONTROL_FLOW_GUARD_POLICY
+{
+    union
+    {
+        ULONG Flags;
+        struct
+        {
+            ULONG EnableControlFlowGuard : 1;
+            ULONG ReservedFlags : 31;
+        };
+    };
+} PROCESS_MITIGATION_CONTROL_FLOW_GUARD_POLICY, *PPROCESS_MITIGATION_CONTROL_FLOW_GUARD_POLICY;
+
+// private
 typedef struct _PROCESS_MITIGATION_POLICY_INFORMATION
 {
     PROCESS_MITIGATION_POLICY Policy;
     union
     {
-        //PROCESS_MITIGATION_DEP_POLICY DEPPolicy;
         PROCESS_MITIGATION_ASLR_POLICY ASLRPolicy;
         PROCESS_MITIGATION_STRICT_HANDLE_CHECK_POLICY StrictHandleCheckPolicy;
         PROCESS_MITIGATION_SYSTEM_CALL_DISABLE_POLICY SystemCallDisablePolicy;
         PROCESS_MITIGATION_EXTENSION_POINT_DISABLE_POLICY ExtensionPointDisablePolicy;
+        PROCESS_MITIGATION_DYNAMIC_CODE_POLICY DynamicCodePolicy;
+        PROCESS_MITIGATION_CONTROL_FLOW_GUARD_POLICY ControlFlowGuardPolicy;
+        PROCESS_MITIGATION_BINARY_SIGNATURE_POLICY SignaturePolicy;
     };
 } PROCESS_MITIGATION_POLICY_INFORMATION, *PPROCESS_MITIGATION_POLICY_INFORMATION;
 
 typedef struct _PROCESS_KEEPALIVE_COUNT_INFORMATION
 {
-    ULONG Count;
+    ULONG WakeCount;
+    ULONG NoWakeCount;
 } PROCESS_KEEPALIVE_COUNT_INFORMATION, *PPROCESS_KEEPALIVE_COUNT_INFORMATION;
 
 typedef struct _PROCESS_REVOKE_FILE_HANDLES_INFORMATION
 {
     UNICODE_STRING TargetDevicePath;
 } PROCESS_REVOKE_FILE_HANDLES_INFORMATION, *PPROCESS_REVOKE_FILE_HANDLES_INFORMATION;
+
+// begin_private
+
+typedef enum _PROCESS_WORKING_SET_OPERATION
+{
+    ProcessWorkingSetSwap,
+    ProcessWorkingSetEmpty,
+    ProcessWorkingSetOperationMax
+} PROCESS_WORKING_SET_OPERATION;
+
+typedef struct _PROCESS_WORKING_SET_CONTROL
+{
+    ULONG Version;
+    PROCESS_WORKING_SET_OPERATION Operation;
+    ULONG Flags;
+} PROCESS_WORKING_SET_CONTROL, *PPROCESS_WORKING_SET_CONTROL;
+
+typedef enum _PS_PROTECTED_TYPE
+{
+    PsProtectedTypeNone,
+    PsProtectedTypeProtectedLight,
+    PsProtectedTypeProtected,
+    PsProtectedTypeMax
+} PS_PROTECTED_TYPE;
+
+typedef enum _PS_PROTECTED_SIGNER
+{
+    PsProtectedSignerNone,
+    PsProtectedSignerAuthenticode,
+    PsProtectedSignerCodeGen,
+    PsProtectedSignerAntimalware,
+    PsProtectedSignerLsa,
+    PsProtectedSignerWindows,
+    PsProtectedSignerWinTcb,
+    PsProtectedSignerMax
+} PS_PROTECTED_SIGNER;
+
+typedef struct _PS_PROTECTION
+{
+    union
+    {
+        UCHAR Level;
+        struct
+        {
+            UCHAR Type : 3;
+            UCHAR Audit : 1;
+            UCHAR Signer : 4;
+        };
+    };
+} PS_PROTECTION, *PPS_PROTECTION;
+
+// end_private
 
 #endif
 
@@ -600,14 +674,14 @@ NTSYSCALLAPI
 NTSTATUS
 NTAPI
 NtCreateProcess(
-    __out PHANDLE ProcessHandle,
-    __in ACCESS_MASK DesiredAccess,
-    __in_opt POBJECT_ATTRIBUTES ObjectAttributes,
-    __in HANDLE ParentProcess,
-    __in BOOLEAN InheritObjectTable,
-    __in_opt HANDLE SectionHandle,
-    __in_opt HANDLE DebugPort,
-    __in_opt HANDLE ExceptionPort
+    _Out_ PHANDLE ProcessHandle,
+    _In_ ACCESS_MASK DesiredAccess,
+    _In_opt_ POBJECT_ATTRIBUTES ObjectAttributes,
+    _In_ HANDLE ParentProcess,
+    _In_ BOOLEAN InheritObjectTable,
+    _In_opt_ HANDLE SectionHandle,
+    _In_opt_ HANDLE DebugPort,
+    _In_opt_ HANDLE ExceptionPort
     );
 
 #define PROCESS_CREATE_FLAGS_BREAKAWAY 0x00000001
@@ -620,47 +694,47 @@ NTSYSCALLAPI
 NTSTATUS
 NTAPI
 NtCreateProcessEx(
-    __out PHANDLE ProcessHandle,
-    __in ACCESS_MASK DesiredAccess,
-    __in_opt POBJECT_ATTRIBUTES ObjectAttributes,
-    __in HANDLE ParentProcess,
-    __in ULONG Flags,
-    __in_opt HANDLE SectionHandle,
-    __in_opt HANDLE DebugPort,
-    __in_opt HANDLE ExceptionPort,
-    __in ULONG JobMemberLevel
+    _Out_ PHANDLE ProcessHandle,
+    _In_ ACCESS_MASK DesiredAccess,
+    _In_opt_ POBJECT_ATTRIBUTES ObjectAttributes,
+    _In_ HANDLE ParentProcess,
+    _In_ ULONG Flags,
+    _In_opt_ HANDLE SectionHandle,
+    _In_opt_ HANDLE DebugPort,
+    _In_opt_ HANDLE ExceptionPort,
+    _In_ ULONG JobMemberLevel
     );
 
 NTSYSCALLAPI
 NTSTATUS
 NTAPI
 NtOpenProcess(
-    __out PHANDLE ProcessHandle,
-    __in ACCESS_MASK DesiredAccess,
-    __in POBJECT_ATTRIBUTES ObjectAttributes,
-    __in_opt PCLIENT_ID ClientId
+    _Out_ PHANDLE ProcessHandle,
+    _In_ ACCESS_MASK DesiredAccess,
+    _In_ POBJECT_ATTRIBUTES ObjectAttributes,
+    _In_opt_ PCLIENT_ID ClientId
     );
 
 NTSYSCALLAPI
 NTSTATUS
 NTAPI
 NtTerminateProcess(
-    __in_opt HANDLE ProcessHandle,
-    __in NTSTATUS ExitStatus
+    _In_opt_ HANDLE ProcessHandle,
+    _In_ NTSTATUS ExitStatus
     );
 
 NTSYSCALLAPI
 NTSTATUS
 NTAPI
 NtSuspendProcess(
-    __in HANDLE ProcessHandle
+    _In_ HANDLE ProcessHandle
     );
 
 NTSYSCALLAPI
 NTSTATUS
 NTAPI
 NtResumeProcess(
-    __in HANDLE ProcessHandle
+    _In_ HANDLE ProcessHandle
     );
 
 #define NtCurrentProcess() ((HANDLE)(LONG_PTR)-1)
@@ -678,11 +752,11 @@ NTSYSCALLAPI
 NTSTATUS
 NTAPI
 NtQueryInformationProcess(
-    __in HANDLE ProcessHandle,
-    __in PROCESSINFOCLASS ProcessInformationClass,
-    __out_bcount(ProcessInformationLength) PVOID ProcessInformation,
-    __in ULONG ProcessInformationLength,
-    __out_opt PULONG ReturnLength
+    _In_ HANDLE ProcessHandle,
+    _In_ PROCESSINFOCLASS ProcessInformationClass,
+    _Out_writes_bytes_(ProcessInformationLength) PVOID ProcessInformation,
+    _In_ ULONG ProcessInformationLength,
+    _Out_opt_ PULONG ReturnLength
     );
 
 #if (PHNT_VERSION >= PHNT_WS03)
@@ -690,11 +764,11 @@ NTSYSCALLAPI
 NTSTATUS
 NTAPI
 NtGetNextProcess(
-    __in HANDLE ProcessHandle,
-    __in ACCESS_MASK DesiredAccess,
-    __in ULONG HandleAttributes,
-    __in ULONG Flags,
-    __out PHANDLE NewProcessHandle
+    _In_ HANDLE ProcessHandle,
+    _In_ ACCESS_MASK DesiredAccess,
+    _In_ ULONG HandleAttributes,
+    _In_ ULONG Flags,
+    _Out_ PHANDLE NewProcessHandle
     );
 #endif
 
@@ -703,12 +777,12 @@ NTSYSCALLAPI
 NTSTATUS
 NTAPI
 NtGetNextThread(
-    __in HANDLE ProcessHandle,
-    __in HANDLE ThreadHandle,
-    __in ACCESS_MASK DesiredAccess,
-    __in ULONG HandleAttributes,
-    __in ULONG Flags,
-    __out PHANDLE NewThreadHandle
+    _In_ HANDLE ProcessHandle,
+    _In_ HANDLE ThreadHandle,
+    _In_ ACCESS_MASK DesiredAccess,
+    _In_ ULONG HandleAttributes,
+    _In_ ULONG Flags,
+    _Out_ PHANDLE NewThreadHandle
     );
 #endif
 
@@ -716,10 +790,10 @@ NTSYSCALLAPI
 NTSTATUS
 NTAPI
 NtSetInformationProcess(
-    __in HANDLE ProcessHandle,
-    __in PROCESSINFOCLASS ProcessInformationClass,
-    __in_bcount(ProcessInformationLength) PVOID ProcessInformation,
-    __in ULONG ProcessInformationLength
+    _In_ HANDLE ProcessHandle,
+    _In_ PROCESSINFOCLASS ProcessInformationClass,
+    _In_reads_bytes_(ProcessInformationLength) PVOID ProcessInformation,
+    _In_ ULONG ProcessInformationLength
     );
 
 NTSYSCALLAPI
@@ -739,48 +813,48 @@ NTSYSCALLAPI
 NTSTATUS
 NTAPI
 NtCreateThread(
-    __out PHANDLE ThreadHandle,
-    __in ACCESS_MASK DesiredAccess,
-    __in_opt POBJECT_ATTRIBUTES ObjectAttributes,
-    __in HANDLE ProcessHandle,
-    __out PCLIENT_ID ClientId,
-    __in PCONTEXT ThreadContext,
-    __in PINITIAL_TEB InitialTeb,
-    __in BOOLEAN CreateSuspended
+    _Out_ PHANDLE ThreadHandle,
+    _In_ ACCESS_MASK DesiredAccess,
+    _In_opt_ POBJECT_ATTRIBUTES ObjectAttributes,
+    _In_ HANDLE ProcessHandle,
+    _Out_ PCLIENT_ID ClientId,
+    _In_ PCONTEXT ThreadContext,
+    _In_ PINITIAL_TEB InitialTeb,
+    _In_ BOOLEAN CreateSuspended
     );
 
 NTSYSCALLAPI
 NTSTATUS
 NTAPI
 NtOpenThread(
-    __out PHANDLE ThreadHandle,
-    __in ACCESS_MASK DesiredAccess,
-    __in POBJECT_ATTRIBUTES ObjectAttributes,
-    __in_opt PCLIENT_ID ClientId
+    _Out_ PHANDLE ThreadHandle,
+    _In_ ACCESS_MASK DesiredAccess,
+    _In_ POBJECT_ATTRIBUTES ObjectAttributes,
+    _In_opt_ PCLIENT_ID ClientId
     );
 
 NTSYSCALLAPI
 NTSTATUS
 NTAPI
 NtTerminateThread(
-    __in_opt HANDLE ThreadHandle,
-    __in NTSTATUS ExitStatus
+    _In_opt_ HANDLE ThreadHandle,
+    _In_ NTSTATUS ExitStatus
     );
 
 NTSYSCALLAPI
 NTSTATUS
 NTAPI
 NtSuspendThread(
-    __in HANDLE ThreadHandle,
-    __out_opt PULONG PreviousSuspendCount
+    _In_ HANDLE ThreadHandle,
+    _Out_opt_ PULONG PreviousSuspendCount
     );
 
 NTSYSCALLAPI
 NTSTATUS
 NTAPI
 NtResumeThread(
-    __in HANDLE ThreadHandle,
-    __out_opt PULONG PreviousSuspendCount
+    _In_ HANDLE ThreadHandle,
+    _Out_opt_ PULONG PreviousSuspendCount
     );
 
 NTSYSCALLAPI
@@ -794,52 +868,52 @@ NTSYSCALLAPI
 NTSTATUS
 NTAPI
 NtGetContextThread(
-    __in HANDLE ThreadHandle,
-    __inout PCONTEXT ThreadContext
+    _In_ HANDLE ThreadHandle,
+    _Inout_ PCONTEXT ThreadContext
     );
 
 NTSYSCALLAPI
 NTSTATUS
 NTAPI
 NtSetContextThread(
-    __in HANDLE ThreadHandle,
-    __in PCONTEXT ThreadContext
+    _In_ HANDLE ThreadHandle,
+    _In_ PCONTEXT ThreadContext
     );
 
 NTSYSCALLAPI
 NTSTATUS
 NTAPI
 NtQueryInformationThread(
-    __in HANDLE ThreadHandle,
-    __in THREADINFOCLASS ThreadInformationClass,
-    __out_bcount(ThreadInformationLength) PVOID ThreadInformation,
-    __in ULONG ThreadInformationLength,
-    __out_opt PULONG ReturnLength
+    _In_ HANDLE ThreadHandle,
+    _In_ THREADINFOCLASS ThreadInformationClass,
+    _Out_writes_bytes_(ThreadInformationLength) PVOID ThreadInformation,
+    _In_ ULONG ThreadInformationLength,
+    _Out_opt_ PULONG ReturnLength
     );
 
 NTSYSCALLAPI
 NTSTATUS
 NTAPI
 NtSetInformationThread(
-    __in HANDLE ThreadHandle,
-    __in THREADINFOCLASS ThreadInformationClass,
-    __in_bcount(ThreadInformationLength) PVOID ThreadInformation,
-    __in ULONG ThreadInformationLength
+    _In_ HANDLE ThreadHandle,
+    _In_ THREADINFOCLASS ThreadInformationClass,
+    _In_reads_bytes_(ThreadInformationLength) PVOID ThreadInformation,
+    _In_ ULONG ThreadInformationLength
     );
 
 NTSYSCALLAPI
 NTSTATUS
 NTAPI
 NtAlertThread(
-    __in HANDLE ThreadHandle
+    _In_ HANDLE ThreadHandle
     );
 
 NTSYSCALLAPI
 NTSTATUS
 NTAPI
 NtAlertResumeThread(
-    __in HANDLE ThreadHandle,
-    __out_opt PULONG PreviousSuspendCount
+    _In_ HANDLE ThreadHandle,
+    _Out_opt_ PULONG PreviousSuspendCount
     );
 
 NTSYSCALLAPI
@@ -853,45 +927,45 @@ NTSYSCALLAPI
 NTSTATUS
 NTAPI
 NtImpersonateThread(
-    __in HANDLE ServerThreadHandle,
-    __in HANDLE ClientThreadHandle,
-    __in PSECURITY_QUALITY_OF_SERVICE SecurityQos
+    _In_ HANDLE ServerThreadHandle,
+    _In_ HANDLE ClientThreadHandle,
+    _In_ PSECURITY_QUALITY_OF_SERVICE SecurityQos
     );
 
 NTSYSCALLAPI
 NTSTATUS
 NTAPI
 NtRegisterThreadTerminatePort(
-    __in HANDLE PortHandle
+    _In_ HANDLE PortHandle
     );
 
 NTSYSCALLAPI
 NTSTATUS
 NTAPI
 NtSetLdtEntries(
-    __in ULONG Selector0,
-    __in ULONG Entry0Low,
-    __in ULONG Entry0Hi,
-    __in ULONG Selector1,
-    __in ULONG Entry1Low,
-    __in ULONG Entry1Hi
+    _In_ ULONG Selector0,
+    _In_ ULONG Entry0Low,
+    _In_ ULONG Entry0Hi,
+    _In_ ULONG Selector1,
+    _In_ ULONG Entry1Low,
+    _In_ ULONG Entry1Hi
     );
 
 typedef VOID (*PPS_APC_ROUTINE)(
-    __in_opt PVOID ApcArgument1,
-    __in_opt PVOID ApcArgument2,
-    __in_opt PVOID ApcArgument3
+    _In_opt_ PVOID ApcArgument1,
+    _In_opt_ PVOID ApcArgument2,
+    _In_opt_ PVOID ApcArgument3
     );
 
 NTSYSCALLAPI
 NTSTATUS
 NTAPI
 NtQueueApcThread(
-    __in HANDLE ThreadHandle,
-    __in PPS_APC_ROUTINE ApcRoutine,
-    __in_opt PVOID ApcArgument1,
-    __in_opt PVOID ApcArgument2,
-    __in_opt PVOID ApcArgument3
+    _In_ HANDLE ThreadHandle,
+    _In_ PPS_APC_ROUTINE ApcRoutine,
+    _In_opt_ PVOID ApcArgument1,
+    _In_opt_ PVOID ApcArgument2,
+    _In_opt_ PVOID ApcArgument3
     );
 
 #endif
@@ -929,7 +1003,7 @@ typedef enum _PS_ATTRIBUTE_NUM
     PsAttributeIdealProcessor, // in PPROCESSOR_NUMBER
     PsAttributeUmsThread, // ? in PUMS_CREATE_THREAD_ATTRIBUTES
     PsAttributeMitigationOptions, // in UCHAR
-    PsAttributeSecurityCapabilities,
+    PsAttributeProtectionLevel,
     PsAttributeMax
 } PS_ATTRIBUTE_NUM;
 
@@ -1134,17 +1208,17 @@ NTSYSCALLAPI
 NTSTATUS
 NTAPI
 NtCreateUserProcess(
-    __out PHANDLE ProcessHandle,
-    __out PHANDLE ThreadHandle,
-    __in ACCESS_MASK ProcessDesiredAccess,
-    __in ACCESS_MASK ThreadDesiredAccess,
-    __in_opt POBJECT_ATTRIBUTES ProcessObjectAttributes,
-    __in_opt POBJECT_ATTRIBUTES ThreadObjectAttributes,
-    __in ULONG ProcessFlags, // PROCESS_CREATE_FLAGS_*
-    __in ULONG ThreadFlags, // THREAD_CREATE_FLAGS_*
-    __in_opt PVOID ProcessParameters,
-    __inout PPS_CREATE_INFO CreateInfo,
-    __in_opt PPS_ATTRIBUTE_LIST AttributeList
+    _Out_ PHANDLE ProcessHandle,
+    _Out_ PHANDLE ThreadHandle,
+    _In_ ACCESS_MASK ProcessDesiredAccess,
+    _In_ ACCESS_MASK ThreadDesiredAccess,
+    _In_opt_ POBJECT_ATTRIBUTES ProcessObjectAttributes,
+    _In_opt_ POBJECT_ATTRIBUTES ThreadObjectAttributes,
+    _In_ ULONG ProcessFlags, // PROCESS_CREATE_FLAGS_*
+    _In_ ULONG ThreadFlags, // THREAD_CREATE_FLAGS_*
+    _In_opt_ PVOID ProcessParameters,
+    _Inout_ PPS_CREATE_INFO CreateInfo,
+    _In_opt_ PPS_ATTRIBUTE_LIST AttributeList
     );
 #endif
 
@@ -1163,17 +1237,17 @@ NTSYSCALLAPI
 NTSTATUS
 NTAPI
 NtCreateThreadEx(
-    __out PHANDLE ThreadHandle,
-    __in ACCESS_MASK DesiredAccess,
-    __in_opt POBJECT_ATTRIBUTES ObjectAttributes,
-    __in HANDLE ProcessHandle,
-    __in PVOID StartRoutine,
-    __in_opt PVOID Argument,
-    __in ULONG CreateFlags, // THREAD_CREATE_FLAGS_*
-    __in_opt ULONG_PTR ZeroBits,
-    __in_opt SIZE_T StackSize,
-    __in_opt SIZE_T MaximumStackSize,
-    __in_opt PPS_ATTRIBUTE_LIST AttributeList
+    _Out_ PHANDLE ThreadHandle,
+    _In_ ACCESS_MASK DesiredAccess,
+    _In_opt_ POBJECT_ATTRIBUTES ObjectAttributes,
+    _In_ HANDLE ProcessHandle,
+    _In_ PVOID StartRoutine,
+    _In_opt_ PVOID Argument,
+    _In_ ULONG CreateFlags, // THREAD_CREATE_FLAGS_*
+    _In_opt_ ULONG_PTR ZeroBits,
+    _In_opt_ SIZE_T StackSize,
+    _In_opt_ SIZE_T MaximumStackSize,
+    _In_opt_ PPS_ATTRIBUTE_LIST AttributeList
     );
 #endif
 
@@ -1198,9 +1272,9 @@ NTSYSCALLAPI
 NTSTATUS
 NTAPI
 NtAllocateReserveObject(
-    __out PHANDLE MemoryReserveHandle,
-    __in_opt POBJECT_ATTRIBUTES ObjectAttributes,
-    __in MEMORY_RESERVE_TYPE Type
+    _Out_ PHANDLE MemoryReserveHandle,
+    _In_opt_ POBJECT_ATTRIBUTES ObjectAttributes,
+    _In_ MEMORY_RESERVE_TYPE Type
     );
 #endif
 
@@ -1209,12 +1283,12 @@ NTSYSCALLAPI
 NTSTATUS
 NTAPI
 NtQueueApcThreadEx(
-    __in HANDLE ThreadHandle,
-    __in_opt HANDLE UserApcReserveHandle,
-    __in PPS_APC_ROUTINE ApcRoutine,
-    __in_opt PVOID ApcArgument1,
-    __in_opt PVOID ApcArgument2,
-    __in_opt PVOID ApcArgument3
+    _In_ HANDLE ThreadHandle,
+    _In_opt_ HANDLE UserApcReserveHandle,
+    _In_ PPS_APC_ROUTINE ApcRoutine,
+    _In_opt_ PVOID ApcArgument1,
+    _In_opt_ PVOID ApcArgument2,
+    _In_opt_ PVOID ApcArgument3
     );
 #endif
 
@@ -1230,72 +1304,72 @@ NTSYSCALLAPI
 NTSTATUS
 NTAPI
 NtCreateJobObject(
-    __out PHANDLE JobHandle,
-    __in ACCESS_MASK DesiredAccess,
-    __in_opt POBJECT_ATTRIBUTES ObjectAttributes
+    _Out_ PHANDLE JobHandle,
+    _In_ ACCESS_MASK DesiredAccess,
+    _In_opt_ POBJECT_ATTRIBUTES ObjectAttributes
     );
 
 NTSYSCALLAPI
 NTSTATUS
 NTAPI
 NtOpenJobObject(
-    __out PHANDLE JobHandle,
-    __in ACCESS_MASK DesiredAccess,
-    __in POBJECT_ATTRIBUTES ObjectAttributes
+    _Out_ PHANDLE JobHandle,
+    _In_ ACCESS_MASK DesiredAccess,
+    _In_ POBJECT_ATTRIBUTES ObjectAttributes
     );
 
 NTSYSCALLAPI
 NTSTATUS
 NTAPI
 NtAssignProcessToJobObject(
-    __in HANDLE JobHandle,
-    __in HANDLE ProcessHandle
+    _In_ HANDLE JobHandle,
+    _In_ HANDLE ProcessHandle
     );
 
 NTSYSCALLAPI
 NTSTATUS
 NTAPI
 NtTerminateJobObject(
-    __in HANDLE JobHandle,
-    __in NTSTATUS ExitStatus
+    _In_ HANDLE JobHandle,
+    _In_ NTSTATUS ExitStatus
     );
 
 NTSYSCALLAPI
 NTSTATUS
 NTAPI
 NtIsProcessInJob(
-    __in HANDLE ProcessHandle,
-    __in_opt HANDLE JobHandle
+    _In_ HANDLE ProcessHandle,
+    _In_opt_ HANDLE JobHandle
     );
 
 NTSYSCALLAPI
 NTSTATUS
 NTAPI
 NtQueryInformationJobObject(
-    __in_opt HANDLE JobHandle,
-    __in JOBOBJECTINFOCLASS JobObjectInformationClass,
-    __out_bcount(JobObjectInformationLength) PVOID JobObjectInformation,
-    __in ULONG JobObjectInformationLength,
-    __out_opt PULONG ReturnLength
+    _In_opt_ HANDLE JobHandle,
+    _In_ JOBOBJECTINFOCLASS JobObjectInformationClass,
+    _Out_writes_bytes_(JobObjectInformationLength) PVOID JobObjectInformation,
+    _In_ ULONG JobObjectInformationLength,
+    _Out_opt_ PULONG ReturnLength
     );
 
 NTSYSCALLAPI
 NTSTATUS
 NTAPI
 NtSetInformationJobObject(
-    __in HANDLE JobHandle,
-    __in JOBOBJECTINFOCLASS JobObjectInformationClass,
-    __in_bcount(JobObjectInformationLength) PVOID JobObjectInformation,
-    __in ULONG JobObjectInformationLength
+    _In_ HANDLE JobHandle,
+    _In_ JOBOBJECTINFOCLASS JobObjectInformationClass,
+    _In_reads_bytes_(JobObjectInformationLength) PVOID JobObjectInformation,
+    _In_ ULONG JobObjectInformationLength
     );
 
 NTSYSCALLAPI
 NTSTATUS
 NTAPI
 NtCreateJobSet(
-    __in ULONG NumJob,
-    __in_ecount(NumJob) PJOB_SET_ARRAY UserJobSet,
-    __in ULONG Flags
+    _In_ ULONG NumJob,
+    _In_reads_(NumJob) PJOB_SET_ARRAY UserJobSet,
+    _In_ ULONG Flags
     );
 
 #endif

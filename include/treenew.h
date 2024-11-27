@@ -211,11 +211,11 @@ typedef enum _PH_TREENEW_MESSAGE
 } PH_TREENEW_MESSAGE;
 
 typedef BOOLEAN (NTAPI *PPH_TREENEW_CALLBACK)(
-    __in HWND hwnd,
-    __in PH_TREENEW_MESSAGE Message,
-    __in_opt PVOID Parameter1,
-    __in_opt PVOID Parameter2,
-    __in_opt PVOID Context
+    _In_ HWND hwnd,
+    _In_ PH_TREENEW_MESSAGE Message,
+    _In_opt_ PVOID Parameter1,
+    _In_opt_ PVOID Parameter2,
+    _In_opt_ PVOID Context
     );
 
 typedef struct _PH_TREENEW_GET_CHILDREN
@@ -381,7 +381,8 @@ typedef struct _PH_TREENEW_SEARCH_EVENT
 #define TNM_HITTEST (WM_USER + 40)
 #define TNM_GETVISIBLECOLUMNCOUNT (WM_USER + 41)
 #define TNM_AUTOSIZECOLUMN (WM_USER + 42)
-#define TNM_LAST (WM_USER + 42)
+#define TNM_SETEMPTYTEXT (WM_USER + 43)
+#define TNM_LAST (WM_USER + 43)
 
 #define TreeNew_SetCallback(hWnd, Callback, Context) \
     SendMessage((hWnd), TNM_SETCALLBACK, (WPARAM)(Context), (LPARAM)(Callback))
@@ -503,6 +504,9 @@ typedef struct _PH_TREENEW_SEARCH_EVENT
 #define TreeNew_AutoSizeColumn(hWnd, Id) \
     SendMessage((hWnd), TNM_AUTOSIZECOLUMN, (WPARAM)(Id), 0)
 
+#define TreeNew_SetEmptyText(hWnd, Text, Flags) \
+    SendMessage((hWnd), TNM_SETEMPTYTEXT, (WPARAM)(Flags), (LPARAM)(Text))
+
 typedef struct _PH_TREENEW_VIEW_PARTS
 {
     RECT ClientRect;
@@ -522,7 +526,7 @@ BOOLEAN PhTreeNewInitialization(
     );
 
 FORCEINLINE VOID PhInitializeTreeNewNode(
-    __in PPH_TREENEW_NODE Node
+    _In_ PPH_TREENEW_NODE Node
     )
 {
     memset(Node, 0, sizeof(PH_TREENEW_NODE));
@@ -532,8 +536,8 @@ FORCEINLINE VOID PhInitializeTreeNewNode(
 }
 
 FORCEINLINE VOID PhInvalidateTreeNewNode(
-    __inout PPH_TREENEW_NODE Node,
-    __in ULONG Flags
+    _Inout_ PPH_TREENEW_NODE Node,
+    _In_ ULONG Flags
     )
 {
     if (Flags & TN_CACHE_COLOR)
@@ -545,14 +549,14 @@ FORCEINLINE VOID PhInvalidateTreeNewNode(
 }
 
 FORCEINLINE BOOLEAN PhAddTreeNewColumn(
-    __in HWND hwnd,
-    __in ULONG Id,
-    __in BOOLEAN Visible,
-    __in PWSTR Text,
-    __in ULONG Width,
-    __in ULONG Alignment,
-    __in ULONG DisplayIndex,
-    __in ULONG TextFlags
+    _In_ HWND hwnd,
+    _In_ ULONG Id,
+    _In_ BOOLEAN Visible,
+    _In_ PWSTR Text,
+    _In_ ULONG Width,
+    _In_ ULONG Alignment,
+    _In_ ULONG DisplayIndex,
+    _In_ ULONG TextFlags
     )
 {
     PH_TREENEW_COLUMN column;
@@ -573,15 +577,15 @@ FORCEINLINE BOOLEAN PhAddTreeNewColumn(
 }
 
 FORCEINLINE BOOLEAN PhAddTreeNewColumnEx(
-    __in HWND hwnd,
-    __in ULONG Id,
-    __in BOOLEAN Visible,
-    __in PWSTR Text,
-    __in ULONG Width,
-    __in ULONG Alignment,
-    __in ULONG DisplayIndex,
-    __in ULONG TextFlags,
-    __in BOOLEAN SortDescending
+    _In_ HWND hwnd,
+    _In_ ULONG Id,
+    _In_ BOOLEAN Visible,
+    _In_ PWSTR Text,
+    _In_ ULONG Width,
+    _In_ ULONG Alignment,
+    _In_ ULONG DisplayIndex,
+    _In_ ULONG TextFlags,
+    _In_ BOOLEAN SortDescending
     )
 {
     PH_TREENEW_COLUMN column;

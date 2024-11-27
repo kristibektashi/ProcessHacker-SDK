@@ -8,7 +8,7 @@
 
 typedef enum _KPH_PROCESS_INFORMATION_CLASS
 {
-    KphProcessProtectionInformation = 1, // qs: KPH_PROCESS_PROTECTION_INFORMATION
+    KphProcessProtectionInformation = 1, // q: KPH_PROCESS_PROTECTION_INFORMATION
     KphProcessExecuteFlags = 2, // s: ULONG
     KphProcessIoPriority = 3, // qs: ULONG
     MaxKphProcessInfoClass
@@ -131,13 +131,15 @@ typedef struct _KPH_DYN_STRUCT_DATA
 {
     SHORT EgeGuid;
     SHORT EpObjectTable;
-    SHORT EpProtectedProcessOff;
-    SHORT EpProtectedProcessBit;
+    SHORT Reserved0;
+    SHORT Reserved1;
     SHORT EpRundownProtect;
     SHORT EreGuidEntry;
     SHORT HtHandleContentionEvent;
     SHORT OtName;
     SHORT OtIndex;
+    SHORT ObDecodeShift;
+    SHORT ObAttributesShift;
 } KPH_DYN_STRUCT_DATA, *PKPH_DYN_STRUCT_DATA;
 
 typedef struct _KPH_DYN_PACKAGE
@@ -150,7 +152,7 @@ typedef struct _KPH_DYN_PACKAGE
     KPH_DYN_STRUCT_DATA StructData;
 } KPH_DYN_PACKAGE, *PKPH_DYN_PACKAGE;
 
-#define KPH_DYN_CONFIGURATION_VERSION 1
+#define KPH_DYN_CONFIGURATION_VERSION 2
 #define KPH_DYN_MAXIMUM_PACKAGES 64
 
 typedef struct _KPH_DYN_CONFIGURATION
