@@ -347,6 +347,7 @@ typedef struct _PH_THREAD_STACK_FRAME
 
 #define PH_WALK_I386_STACK 0x1
 #define PH_WALK_AMD64_STACK 0x2
+#define PH_WALK_ARM_STACK 0x4
 #define PH_WALK_KERNEL_STACK 0x10
 
 /**
